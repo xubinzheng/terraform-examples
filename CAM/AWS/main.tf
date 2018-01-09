@@ -21,7 +21,6 @@ resource "aws_instance" "aws_instance" {
   ami = "ami-1d4e7a66"
   key_name = "${var.key_name}"
   tags {
-    Name = "${var.aws_instance_name}",
-    Tag1 = "tag1"
+    Name = "${var.aws_instance_name}"
   }
 }
