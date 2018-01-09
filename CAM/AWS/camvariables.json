@@ -1,0 +1,43 @@
+[
+    {
+      "name": "aws_access_id",
+      "label": "AWS Access ID",
+      "description": "Your AWS Access ID",
+      "hidden": false,
+      "immutable": false,
+      "required": true,
+      "secured": false,
+      "type": "string"
+    },
+    {
+      "name": "aws_secret_key",
+      "label": "AWS Secret Key",
+      "description": "Your AWS Secret Key",
+      "hidden": false,
+      "immutable": false,
+      "required": true,
+      "secured": true,
+      "type": "string"
+    },
+    {
+      "name": "key_name",
+      "label": "AWS Keypair Name",
+      "description": "The name for your AWS keypair",
+      "hidden": false,
+      "immutable": false,
+      "required": true,
+      "secured": false,
+      "type": "string"
+    },
+    {
+      "name": "aws_instance_name",
+      "label": "AWS Instance Name",
+      "description": "The name for your AWS instance",
+      "hidden": false,
+      "immutable": false,
+      "required": true,
+      "secured": false,
+      "type": "string",
+      "default": "test-server"
+    }
+]
