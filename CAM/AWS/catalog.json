@@ -1,0 +1,64 @@
+{
+    "name": "Single VM Deployment on AWS",
+    "description": "This template will deploy a single VM on AWS.",
+    "version": "1.0",
+    "imageUrl": "",
+    "image": "",
+    "type": "chefcontent",
+    "status": "active",
+    "manifest": {
+      "template_type": "Terraform",
+      "template_format": "HCL",
+      "template_provider": "Other",
+      "template": {
+        "templateData": "",
+        "templateVariables": "",
+        "templateOutput": ""
+      },
+      "template_source": {
+        "githubRepoUrl": "",
+        "githubAccessToken": "",
+        "relativePathToTemplateFolder": "CAM/AWS",
+        "templateFileName": "main.tf"
+      }
+    },
+    "metadata": {
+      "displayName": "Single VM Deployment on AWS",
+      "providerDisplayName": "Other",
+      "longDescription": "This template will deploy a single VM on AWS.",
+      "bullets": [
+{
+    "title": "Clouds",
+    "description": " AWS<br>"},
+{
+    "title": "Template Version",
+    "description": "1.0<br>"},
+{
+    "title": "Operating Systems Supported",
+    "description": "Ubuntu 16.04<br>"},
+{
+    "title": "Topology",
+    "description": "1) Linux Virual Machine<br>"},
+{
+    "title": "Software Deployed",
+    "description": "- None<br>"},
+{
+    "title": "Default Virtual Machine Settings",
+    "description": " t2.micro<br>"},
+{
+    "title": "Usage and Special Notes",
+    "description": "None<br>"}
+],
+      "featuredImageUrl": "",
+      "imageUrl": "",
+      "mediumImageUrl": "",
+      "smallImageUrl": "",
+      "documentationUrl": "",
+      "termsUrl": "",
+      "media": [
+      ]
+    },
+    "toolchain": {
+      "git": "https://github.com/ibmcam/cam-toolchain"
+    }
+}
