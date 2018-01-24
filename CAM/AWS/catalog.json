@@ -5,7 +5,7 @@
     	"manifest": {
     		"template_type": "Terraform",
     		"template_provider": "Other",
-    		"icon": "serviceicon_9.svg"
+    		"icon": "serviceicon_10.svg"
     	},
     	"metadata": {
     		"displayName": "Single VM",
