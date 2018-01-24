@@ -32,6 +32,7 @@ variable "region" {
 variable "ami" {
   type = "string"
   description = "Generated"
+  default = "us-east"
 }
 
 variable "key_name" {
