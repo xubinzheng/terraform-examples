@@ -1,0 +1,9 @@
+# Configuration file template
+
+# Description: 
+#   Created 1/15/18 by ucdpadmin. For Cloud Openstack
+
+parameters:
+  availability_zone: TODO
+  key_name: TODO
+  flavor: TODO

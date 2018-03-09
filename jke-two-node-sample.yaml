@@ -1,0 +1,50 @@
+heat_template_version: 2013-05-23
+
+description: >
+  Created 10/31/17 by ucdpadmin. For Cloud admin@EC2
+
+parameters:
+  flavor:
+    type: string
+    description: 'Flavor to be used for compute instance'
+  key_name:
+    type: string
+    description: 'For most clouds, the name of the key-pair to be used for the compute instance; for VMware clouds, the contents of the public SSH key for the compute instance'
+  availability_zone:
+    type: string
+    description: 'Name of availability zone in which to create the instance'
+    default: 'nova'
+  network-id__for__UCD-P_net2:
+    type: string
+    description: 'Generated to reference ''UCD-P_net2'' network.'
+    default: 'f29fc0a1-b715-43fc-bf1f-9f59f092d943'
+parameter_groups:
+    - { label: 'Image Parameters', parameters: [flavor, key_name] }
+    - { label: 'Network Parameters', parameters: [availability_zone, network-id__for__UCD-P_net2] }
+resources:
+## REFERENCE {"UCD-P_net2":{"type": "OS::Neutron::Net", "properties": {"network_id": "f29fc0a1-b715-43fc-bf1f-9f59f092d943", "external":"false", "subnets": [{"id":"6956fc80-57be-448f-97cd-79d92d7fb9c8","name":"UCD-P_subnet2","cidr":"10.10.10.0\/24"}] }}}
+
+  KVM-RHE7_4-Srv-x64:
+    type: OS::Nova::Server
+    properties:
+      networks:
+          - port: { get_resource: KVM-RHE7_4-Srv-x64__to__UCD-P_net2__port  }
+      name: "KVM-RHE7_4-Srv-x64"
+      image: "f3209adb-51ab-4503-9a03-3c8ce9830baa" # KVM-RHE7.4-Srv-x64
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      availability_zone: { get_param: availability_zone }
+      metadata: 
+        "__os_type__" : "Linux"
+
+  KVM-RHE7_4-Srv-x64__to__UCD-P_net2__port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_param: network-id__for__UCD-P_net2 }
+      replacement_policy: AUTO
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://localhost:8080/landscaper/view/projects?open=ucdpadmin_00000000_0000_0000_0000_000000000002-OrionContent/default/jke-two-node-sample.yaml.yml
+

@@ -1,0 +1,115 @@
+heat_template_version: 2013-05-23
+
+description: >
+  Created 9/25/17 by ucdpadmin. For Cloud admin@Azure-1
+
+parameters:
+  resource_group:
+    type: string
+    description: 'Generated'
+  flavor:
+    type: string
+    description: 'Flavor to be used for compute instance'
+  admin_user:
+    type: string
+    description: 'The administrator user for the server'
+  admin_pass:
+    type: string
+    description: 'The administrator password for the server'
+    hidden: true
+  availability_zone:
+    type: string
+    description: 'Name of availability zone in which to create the instance'
+  storage_account:
+    type: string
+    description: 'The storage account'
+parameter_groups:
+    - { label: 'Image Parameters', parameters: [admin_pass, admin_user, flavor, storage_account] }
+    - { label: 'Network Parameters', parameters: [availability_zone, resource_group] }
+resources:
+  virtual-network:
+    type: OS::Neutron::Net
+    properties:
+      name: virtual-network
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+        address_prefixes: 
+          - '10.0.0.0/16'
+
+  default_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: virtual-network }
+      cidr: 10.0.0.0/16
+      name: default_subnet
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+
+  Ubuntu_Server_12_04_5-LTS:
+    type: OS::Nova::Server
+    properties:
+      networks:
+          - port: { get_resource: Ubuntu_Server_12_04_5-LTS__to__virtual-network__port  }
+      name: "Ubuntu-Server-12-04-5-LTS"
+      image: "Canonical:UbuntuServer:12.04.5-LTS:12.04.201705020" # UbuntuServer
+      flavor: { get_param: flavor }
+      admin_user: { get_param: admin_user }
+      admin_pass: { get_param: admin_pass }
+      availability_zone: { get_param: availability_zone }
+      metadata: 
+        "__os_type__" : "Linux"
+    metadata:
+      azure_properties:
+        use_cloudinit: False
+        storage_account: { get_param: storage_account }
+        use_managed_disk: True
+        volume_type: "hdd"
+        resource_group: { get_param: resource_group }
+
+  security-group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: security-group
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+        rules:
+          - name: port-22
+            description: 'open port 22'
+            direction: Inbound
+            protocol: '*'
+            source_address_prefix: '*'
+            destination_address_prefix: '*'
+            destination_port_range: '*'
+            source_port_range: '22'
+            access: Allow
+            priority: 101
+          - name: rule2
+            direction: Outbound
+            protocol: 'Tcp'
+            source_address_prefix: 'Internet'
+            destination_address_prefix: '*'
+            destination_port_range: '*'
+            source_port_range: '*'
+            access: Deny
+            priority: 102
+
+  Ubuntu_Server_12_04_5-LTS__to__virtual-network__port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups:
+          - { get_resource: security-group }
+      network_id: { get_resource: virtual-network }
+      replacement_policy: AUTO
+      name: nic
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://localhost:8080/landscaper/view/projects?open=ucdpadmin_00000000_0000_0000_0000_000000000002-OrionContent/default/xz-azure-test/new-network.yaml.yml
+

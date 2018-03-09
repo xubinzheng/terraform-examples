@@ -1,0 +1,38 @@
+heat_template_version: 2013-05-23
+
+description: >
+  Created 9/25/17 by ucdpadmin. For Cloud admin@Azure-1
+
+parameters:
+  resource_group:
+    type: string
+    description: 'Generated'
+parameter_groups:
+    - { label: 'Network Parameters', parameters: [resource_group] }
+resources:
+  virtual-network:
+    type: OS::Neutron::Net
+    properties:
+      name: virtual-network
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+        address_prefixes: 
+          - '10.0.0.0/16'
+
+  default_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      network: { get_resource: virtual-network }
+      cidr: 10.0.0.0/16
+      name: default_subnet
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://localhost:8080/landscaper/view/projects?open=ucdpadmin_00000000_0000_0000_0000_000000000002-OrionContent/default/xz-azure-test/network.yaml.yml
+

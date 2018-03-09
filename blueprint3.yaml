@@ -1,0 +1,12 @@
+heat_template_version: 2013-05-23
+
+description: >
+  Created 2/2/18 by ucdpadmin. For Cloud AWS1
+
+resources:
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://localhost:8080/landscaper/view/projects?open=ucdpadmin_00000000_0000_0000_0000_000000000002-OrionContent/default/blueprint3.yaml.yml
+

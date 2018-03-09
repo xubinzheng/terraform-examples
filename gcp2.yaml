@@ -1,0 +1,12 @@
+# Configuration file template
+
+# Description: 
+#   Created 10/31/17 by ucdpadmin. For Cloud admin@EC2
+
+resource_registry:
+  OS::Nova::Server : IBM::Google::Server
+  OS::Neutron::Port : IBM::Google::Port
+  OS::Neutron::FloatingIP : IBM::Google::PublicIP
+  OS::Neutron::FloatingIPAssociation : IBM::Google::PublicIPAssociation
+  OS::Cinder::Volume : IBM::Google::Disk
+  OS::Cinder::VolumeAttachment : IBM::Google::DiskAttachment

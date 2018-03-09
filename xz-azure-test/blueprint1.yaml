@@ -1,0 +1,381 @@
+heat_template_version: 2013-05-23
+
+description: >
+  Created 9/25/17 by ucdpadmin. For Cloud admin@Azure-1
+
+parameters:
+  flavor:
+    type: string
+    description: 'Flavor to be used for compute instance'
+  admin_user:
+    type: string
+    description: 'The administrator user for the server'
+  admin_pass:
+    type: string
+    description: "The administrator password for the server. Password must have 3 of the following:1 lower case character, 1 upper case character, 1 digit, and 1 special character. Between 12 and 72 characters long."
+    hidden: true
+  availability_zone:
+    type: string
+    description: 'Name of availability zone in which to create the instance'
+  storage_account:
+    type: string
+    description: 'The storage account'
+  resource_group:
+    type: string
+    description: 'The Azure resource group'
+  network-id__for__virtual-network:
+    type: string
+    description: 'Generated to reference ''virtual-network'' network.'
+    default: 'virtual-network'
+  ucd_server_url:
+    type: string
+    description: 'The server URL for agent communication to UrbanCode Deploy. Do *not* add a trailing slash.'
+    default: 'http://54.89.250.86:9080'
+  ucd_user:
+    type: string
+    description: 'The user credential for the UrbanCode Deploy server.'
+    default: 'PasswordIsAuthToken'
+  ucd_password:
+    type: string
+    description: 'The user credential for the UrbanCode Deploy server.'
+    hidden: true
+  ucd_relay_url:
+    default: None
+    type: string
+    description: 'The server URL for an agent relay - leave as ''None'' to enable agents to communicate with server directly.'
+  ucd_proxy_port:
+    type: string
+    description: 'The UCD proxy port, the default value is 20080'
+    default: '20080'
+  public_network_id:
+    type: string
+    description: 'Generated for floating IP'
+    default: 'public_network_id'
+parameter_groups:
+    - { label: 'Agent Parameters', parameters: [ucd_password, ucd_proxy_port, ucd_relay_url, ucd_server_url, ucd_user] }
+    - { label: 'Image Parameters', parameters: [admin_pass, admin_user, flavor, resource_group, storage_account] }
+    - { label: 'Network Parameters', parameters: [availability_zone, network-id__for__virtual-network, public_network_id] }
+resources:
+## REFERENCE {"virtual-network":{"type": "OS::Neutron::Net", "properties": {"network_id": "virtual-network", "external":"false", "subnets": [{"state":"Succeeded","cidr":"10.0.0.0\/16","name":"default_subnet","id":"default_subnet"}] }}}
+
+  Ubuntu_Server_16_04-LTS:
+    type: OS::Nova::Server
+    properties:
+      user_data: { get_resource: Ubuntu_Server_16_04-LTS_mime }
+      user_data_format: RAW
+      networks:
+          - port: { get_resource: Ubuntu_Server_16_04-LTS__to__virtual-network__port  }
+      name: "Ubuntu-Server-16-04-LTS"
+      image: "Canonical:UbuntuServer:16.04-LTS:16.04.201709190" # UbuntuServer
+      flavor: { get_param: flavor }
+      admin_user: { get_param: admin_user }
+      admin_pass: { get_param: admin_pass }
+      availability_zone: { get_param: availability_zone }
+      metadata: 
+        "__os_type__" : "Linux"
+    metadata:
+      azure_properties:
+        use_cloudinit: False
+        storage_account: { get_param: storage_account }
+        use_managed_disk: True
+        volume_type: "hdd"
+        resource_group: { get_param: resource_group }
+
+  security-group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: security-group
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+        rules:
+          - name: port-22
+            description: 'open port 22'
+            direction: Inbound
+            protocol: '*'
+            source_address_prefix: '*'
+            destination_address_prefix: '*'
+            destination_port_range: '*'
+            source_port_range: '22'
+            access: Allow
+            priority: 101
+          - name: rule2
+            direction: Outbound
+            protocol: '*'
+            source_address_prefix: 'Internet'
+            destination_address_prefix: '*'
+            destination_port_range: '*'
+            source_port_range: '*'
+            access: Allow
+            priority: 102
+
+  Ubuntu_Server_16_04-LTS__to__virtual-network__port__floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: Ubuntu_Server_16_04-LTS__to__virtual-network__port }
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+        name: floating_ip
+
+  MySQL_Server:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: MySQL_Server_sw_config }
+      server: Ubuntu_Server_16_04-LTS
+      version: LATEST
+      agent_timeout: "360"
+
+  MySQL_Server_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "MySQL Server"
+      component_process: 'deploy mysql 5.7'
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      ucd_relay_url: { get_param: ucd_relay_url }
+      ucd_proxy_port: { get_param: ucd_proxy_port }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+
+  Ubuntu_Server_16_04-LTS_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: { get_resource: ucd_agent_install_linux }
+          subtype: "x-shellscript"
+
+  jke_db:
+    depends_on: [MySQL_Server, WebSphere_Liberty_Profile]
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: jke_db_sw_config }
+      server: Ubuntu_Server_16_04-LTS
+      version: LATEST
+      agent_timeout: "360"
+
+  jke_db_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "jke.db"
+      component_process: deploy
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      ucd_relay_url: { get_param: ucd_relay_url }
+      ucd_proxy_port: { get_param: ucd_proxy_port }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:     # component's environment property definitions
+        ChadPropEnv : "default"
+
+  Ubuntu_Server_16_04-LTS__to__virtual-network__port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups:
+          - { get_resource: security-group }
+      network_id: { get_param: network-id__for__virtual-network }
+      replacement_policy: AUTO
+      name: nic
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+
+  Ubuntu_Server_12_04_5-LTS:
+    type: OS::Nova::Server
+    properties:
+      user_data: { get_resource: Ubuntu_Server_12_04_5-LTS_mime }
+      user_data_format: RAW
+      networks:
+          - port: { get_resource: Ubuntu_Server_12_04_5-LTS__to__virtual-network__port  }
+      name: "Ubuntu-Server-12-04-5-LTS"
+      image: "Canonical:UbuntuServer:12.04.5-LTS:12.04.201705020" # UbuntuServer
+      flavor: { get_param: flavor }
+      admin_user: { get_param: admin_user }
+      admin_pass: { get_param: admin_pass }
+      availability_zone: { get_param: availability_zone }
+      metadata: 
+        "__os_type__" : "Linux"
+    metadata:
+      azure_properties:
+        use_cloudinit: False
+        storage_account: { get_param: storage_account }
+        use_managed_disk: True
+        volume_type: "hdd"
+        resource_group: { get_param: resource_group }
+
+  security-group1:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: security-group1
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+        rules:
+          - name: port-22
+            description: 'open port 22'
+            direction: Inbound
+            protocol: '*'
+            source_address_prefix: '*'
+            destination_address_prefix: '*'
+            destination_port_range: '*'
+            source_port_range: '22'
+            access: Allow
+            priority: 101
+          - name: rule2
+            direction: Outbound
+            protocol: '*'
+            source_address_prefix: 'Internet'
+            destination_address_prefix: '*'
+            destination_port_range: '*'
+            source_port_range: '*'
+            access: Allow
+            priority: 102
+
+  Ubuntu_Server_12_04_5-LTS__to__virtual-network__port__floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_network_id }
+      port_id: { get_resource: Ubuntu_Server_12_04_5-LTS__to__virtual-network__port }
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+        name: floating_ip
+
+  WebSphere_Liberty_Profile:
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: WebSphere_Liberty_Profile_sw_config }
+      server: Ubuntu_Server_12_04_5-LTS
+      version: LATEST
+      agent_timeout: "360"
+
+  WebSphere_Liberty_Profile_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "WebSphere Liberty Profile"
+      component_process: "deploy"
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      ucd_relay_url: { get_param: ucd_relay_url }
+      ucd_proxy_port: { get_param: ucd_proxy_port }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+
+  jke_war:
+    depends_on: [jke_db]
+    type: IBM::UrbanCode::SoftwareDeploy::UCD
+    properties:
+      apply_config: { get_resource: jke_war_sw_config }
+      server: Ubuntu_Server_12_04_5-LTS
+      version: LATEST
+      agent_timeout: "360"
+      inputs:     # component's resource properties
+        Foo : "Foo"
+
+  jke_war_sw_config:
+    type: IBM::UrbanCode::SoftwareConfig::UCD
+    properties: 
+      name: "jke.war"
+      component_process: deploy
+      component_process_timeout: "300"
+      ucd_server_url: { get_param: ucd_server_url } # these should come from resource_tree
+      ucd_username: { get_param: ucd_user }
+      ucd_password: { get_param: ucd_password }
+      ucd_relay_url: { get_param: ucd_relay_url }
+      ucd_proxy_port: { get_param: ucd_proxy_port }
+      application: { get_attr: [resource_tree, application_name] }
+      environment_name: { get_attr: [resource_tree, environment_name] }
+      inputs:     # component's environment property definitions
+        JKE_DB_HOST : "localhost"
+
+  Ubuntu_Server_12_04_5-LTS_mime:
+    type: OS::Heat::MultipartMime
+    properties:
+      parts:
+        - config: { get_resource: ucd_agent_install_linux }
+          subtype: "x-shellscript" 
+
+  Ubuntu_Server_12_04_5-LTS__to__virtual-network__port:
+    type: OS::Neutron::Port
+    properties:
+      security_groups:
+          - { get_resource: security-group1 }
+      network_id: { get_param: network-id__for__virtual-network }
+      replacement_policy: AUTO
+      name: nic
+    metadata:
+      azure_properties:
+        resource_group: { get_param: resource_group }
+
+  resource_tree:
+    type: IBM::UrbanCode::ResourceTree
+    properties:
+       urbancode_deploy_url: { get_param: ucd_server_url }
+       username: { get_param: ucd_user }
+       password: { get_param: ucd_password }
+       ucd_relay_url: { get_param: ucd_relay_url }
+       ucd_proxy_port: { get_param: ucd_proxy_port }
+       team_mappings: 
+       application: JKE
+       base_resource_group: 
+
+  ucd_agent_install_linux:
+    type: OS::Heat::SoftwareConfig
+    properties:
+      config:
+        str_replace:
+          template: |
+            #!/usr/bin/env bash
+            #ifconfig eth0 mtu 1454 ## Optionally patch the MTU
+            export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/root/bin
+            arch=`uname -ms | awk '{print tolower($0)}' | tr " " "-" `
+            agent_archive=ibm-ucd-agent-$arch.tgz
+            if [ "_ucd_relay_url_" != "None" ]; then
+              proxy_args="--proxy _ucd_relay_url_:_ucd_proxy_port_"
+              ucd_remote_host=_ucd_relay_url_
+              agent_args="-r -d -l _ucd_proxy_port_"
+              ucd_jms_port=7916
+            else
+              proxy_args=
+              agent_args=
+              ucd_remote_host=_ucd_server_url_
+              ucd_jms_port=7918
+            fi
+            if ps -ef | grep -v grep | grep -q air-monitor.jar ; then
+              exit 0
+            elif [ -d /opt/ibm-ucd ]; then
+              exit 0
+            fi
+            if command -V apt-get && ! command -V curl; then apt-get -y install curl; fi
+            if command -V yum && ! command -V curl; then yum -y install curl; fi
+            curl $proxy_args -Lk --retry 10 --retry-delay 10 --retry-max-time 120 -o /tmp/$agent_archive -u _ucd_user_:_ucd_password_ "_ucd_server_url_/cli/version/downloadArtifacts?component=ucd-agent-$arch&version=_agent_version_&singleFilePath=$agent_archive"
+            tar xfz /tmp/$agent_archive -C /tmp
+            /tmp/ibm-ucd-agent-install/install-agent-with-options.sh -t "_agent_team_" -p $ucd_jms_port -s $ucd_remote_host $agent_args -x start -v -n _agent_name_
+          params:
+            _agent_name_:
+               str_replace:
+                  template: |
+                    "_application_name_._environment_name_"
+                  params:
+                    _application_name_: { get_attr: [resource_tree, application_name ] }
+                    _environment_name_: { get_param: "OS::stack_name" }
+            _ucd_server_url_: { get_param: ucd_server_url }
+            _ucd_relay_url_: { get_param: ucd_relay_url }
+            _ucd_proxy_port_: { get_param: ucd_proxy_port }
+            _ucd_user_ : { get_param: ucd_user }
+            _ucd_password_ : { get_param: ucd_password }
+            _agent_version_ : "7.1"
+            _agent_team_ : ""
+
+outputs:
+  blueprint_url:
+    description: Blueprint Origin URL
+    value:  http://localhost:8080/landscaper/view/projects?open=ucdpadmin_00000000_0000_0000_0000_000000000002-OrionContent/default/xz-azure-test/blueprint1.yaml.yml
+
